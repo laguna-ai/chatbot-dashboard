@@ -1,0 +1,577 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard de Sesiones</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        :root {
+            --primary: #4361ee;
+            --secondary: #3f37c9;
+            --success: #4cc9f0;
+            --warning: #f72585;
+            --dark: #212529;
+            --light: #f8f9fa;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #f5f7fa 0%, #e4e7f1 100%);
+            min-height: 100vh;
+        }
+        
+        .dashboard-header {
+            background: linear-gradient(90deg, var(--primary) 0%, var(--secondary) 100%);
+            box-shadow: 0 4px 20px rgba(67, 97, 238, 0.3);
+        }
+        
+        .stat-card {
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 6px 15px rgba(0, 0, 0, 0.08);
+            transition: all 0.3s ease;
+            overflow: hidden;
+        }
+        
+        .stat-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 12px 25px rgba(0, 0, 0, 0.15);
+        }
+        
+        .csat-badge {
+            width: 90px;
+            height: 90px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            font-size: 1.8rem;
+            position: relative;
+            background: conic-gradient(var(--success) 0% var(--p), #f0f0f0 var(--p) 100%);
+        }
+        
+        .csat-badge::before {
+            content: '';
+            position: absolute;
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            background: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .chart-container {
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 6px 15px rgba(0, 0, 0, 0.08);
+            padding: 1.5rem;
+        }
+        
+        .chart-header {
+            border-bottom: 1px solid #e9ecef;
+            padding-bottom: 1rem;
+            margin-bottom: 1.5rem;
+        }
+        
+        .progress-bar {
+            height: 8px;
+            border-radius: 4px;
+            background: #e9ecef;
+            overflow: hidden;
+        }
+        
+        .progress-fill {
+            height: 100%;
+            border-radius: 4px;
+            background: var(--primary);
+        }
+        
+        .btn-primary {
+            background: linear-gradient(90deg, var(--primary) 0%, var(--secondary) 100%);
+            border: none;
+            border-radius: 50px;
+            padding: 0.75rem 1.5rem;
+            font-weight: 600;
+            transition: all 0.3s ease;
+        }
+        
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 15px rgba(67, 97, 238, 0.4);
+        }
+        
+        .fade-in {
+            animation: fadeIn 0.5s ease-in;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+    </style>
+</head>
+<body class="min-h-screen">
+    <header class="dashboard-header text-white py-6 px-6 lg:px-12">
+        <div class="container mx-auto flex flex-col md:flex-row justify-between items-center">
+            <div class="flex items-center mb-4 md:mb-0">
+                <i class="fas fa-chart-line text-2xl mr-3"></i>
+                <h1 class="text-2xl md:text-3xl font-bold">Dashboard de Sesiones</h1>
+            </div>
+            <div class="flex items-center space-x-4">
+                <div class="text-sm text-blue-100">
+                    <i class="fas fa-calendar-alt mr-2"></i>
+                    <span id="current-date">Cargando fecha...</span>
+                </div>
+                <a href="#" class="btn-primary flex items-center">
+                    <i class="fas fa-home mr-2"></i>
+                    Volver al inicio
+                </a>
+            </div>
+        </div>
+    </header>
+
+    <main class="container mx-auto py-8 px-4 lg:px-8">
+        <!-- Loading State -->
+        <div id="loading" class="text-center py-12">
+            <div class="inline-block animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500 mb-4"></div>
+            <p class="text-gray-600 font-medium">Cargando datos del dashboard...</p>
+        </div>
+        
+        <!-- Error State -->
+        <div id="error" class="hidden bg-red-50 border border-red-200 rounded-lg p-6 text-center max-w-2xl mx-auto">
+            <i class="fas fa-exclamation-triangle text-red-500 text-4xl mb-4"></i>
+            <h3 class="text-xl font-bold text-red-700 mb-2">Error al cargar los datos</h3>
+            <p class="text-red-600 mb-4" id="error-message">Error desconocido</p>
+            <button id="retry-btn" class="btn-primary bg-red-600 hover:bg-red-700">Reintentar</button>
+        </div>
+        
+        <!-- Dashboard Content -->
+        <div id="dashboard" class="hidden">
+            <!-- Stats Summary -->
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+                <div class="stat-card p-6 fade-in">
+                    <div class="flex justify-between items-start">
+                        <div>
+                            <p class="text-gray-500 font-medium">Sesiones totales</p>
+                            <h2 class="text-3xl font-bold mt-1" id="total-sessions">0</h2>
+                        </div>
+                        <div class="bg-blue-100 p-3 rounded-lg">
+                            <i class="fas fa-comments text-blue-600 text-xl"></i>
+                        </div>
+                    </div>
+                    <div class="mt-4">
+                        <div class="text-sm text-gray-500 flex justify-between mb-1">
+                            <span>Éxito</span>
+                            <span id="success-rate">0%</span>
+                        </div>
+                        <div class="progress-bar">
+                            <div class="progress-fill" style="width: 0%" id="success-bar"></div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="stat-card p-6 fade-in" style="animation-delay: 0.1s">
+                    <div class="flex justify-between items-start">
+                        <div>
+                            <p class="text-gray-500 font-medium">Tasa CSAT</p>
+                            <div class="flex items-center mt-3">
+                                <div class="csat-badge mr-4" id="csat-badge">
+                                    <span class="relative z-10">0%</span>
+                                </div>
+                                <div>
+                                    <h2 class="text-3xl font-bold" id="csat-score">0%</h2>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="bg-green-100 p-3 rounded-lg">
+                            <i class="fas fa-star text-green-600 text-xl"></i>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="stat-card p-6 fade-in" style="animation-delay: 0.2s">
+                    <div class="flex justify-between items-start">
+                        <div>
+                            <p class="text-gray-500 font-medium">Costos OpenAI</p>
+                            <h2 class="text-3xl font-bold mt-1">$<span id="total-cost">0.00</span></h2>
+                            <div class="mt-3 text-sm">
+                                <div class="flex justify-between mb-1">
+                                    <span class="text-blue-600">Usuario:</span>
+                                    <span>$<span id="user-cost">0.00</span></span>
+                                </div>
+                                <div class="flex justify-between">
+                                    <span class="text-red-600">Asistente:</span>
+                                    <span>$<span id="assistant-cost">0.00</span></span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="bg-purple-100 p-3 rounded-lg">
+                            <i class="fas fa-dollar-sign text-purple-600 text-xl"></i>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="stat-card p-6 fade-in" style="animation-delay: 0.3s">
+                    <div class="flex justify-between items-start">
+                        <div>
+                            <p class="text-gray-500 font-medium">Tópicos principales</p>
+                            <h2 class="text-3xl font-bold mt-1" id="top-topics-count">0</h2>
+                            <div class="mt-3">
+                                <div class="flex items-center text-sm mb-1">
+                                    <div class="w-3 h-3 bg-yellow-400 rounded-full mr-2"></div>
+                                    <span id="topic-1">Cargando...</span>
+                                </div>
+                                <div class="flex items-center text-sm">
+                                    <div class="w-3 h-3 bg-blue-400 rounded-full mr-2"></div>
+                                    <span id="topic-2">Cargando...</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="bg-yellow-100 p-3 rounded-lg">
+                            <i class="fas fa-tags text-yellow-600 text-xl"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Charts Section -->
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+                <!-- Topics Chart -->
+                <div class="chart-container fade-in" style="animation-delay: 0.4s">
+                    <div class="chart-header">
+                        <h2 class="text-xl font-bold text-gray-800">Tópicos más populares</h2>
+                        <p class="text-gray-600">Distribución de temas tratados en las sesiones</p>
+                    </div>
+                    <canvas id="topicsChart"></canvas>
+                </div>
+                
+                <!-- Sessions Over Time -->
+                <div class="chart-container fade-in" style="animation-delay: 0.5s">
+                    <div class="chart-header">
+                        <h2 class="text-xl font-bold text-gray-800">Sesiones en el tiempo</h2>
+                        <p class="text-gray-600">Evolución de la actividad diaria</p>
+                    </div>
+                    <canvas id="sessionsOverTimeChart"></canvas>
+                </div>
+            </div>
+            
+            <!-- User Sessions -->
+            <div class="chart-container fade-in mb-8" style="animation-delay: 0.6s">
+                <div class="chart-header">
+                    <h2 class="text-xl font-bold text-gray-800">Sesiones por usuario</h2>
+                    <p class="text-gray-600">Usuarios más activos en el sistema</p>
+                </div>
+                <canvas id="userSessionsChart"></canvas>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        // Set current date
+        document.getElementById('current-date').textContent = new Date().toLocaleDateString('es-ES', {
+            weekday: 'long',
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric'
+        });
+        
+        // API Service
+        const apiService = {
+            baseUrl: 'https://api.example.com', // Reemplazar con la URL real de la API
+            
+            async getSessions() {
+                try {
+                    const response = await fetch(`${this.baseUrl}/api/sessions`);
+                    if (!response.ok) {
+                        throw new Error('Error obteniendo sesiones');
+                    }
+                    return await response.json();
+                } catch (error) {
+                    console.error('Error:', error);
+                    throw error;
+                }
+            }
+        };
+        
+        // Dashboard Controller
+        const dashboard = {
+            init() {
+                this.loadData();
+                document.getElementById('retry-btn').addEventListener('click', () => this.loadData());
+            },
+            
+            async loadData() {
+                this.showLoading();
+                this.hideError();
+                this.hideDashboard();
+                
+                try {
+                    const sessions = await apiService.getSessions();
+                    this.renderDashboard(sessions);
+                } catch (error) {
+                    this.showError(error.message);
+                }
+            },
+            
+            renderDashboard(sessions) {
+                // Actualizar estadísticas
+                this.updateStats(sessions);
+                
+                // Renderizar gráficos
+                this.renderTopicsChart(sessions);
+                this.renderSessionsOverTimeChart(sessions);
+                this.renderUserSessionsChart(sessions);
+                
+                // Mostrar dashboard
+                this.hideLoading();
+                this.showDashboard();
+            },
+            
+            updateStats(sessions) {
+                // Calcular CSAT
+                const successfulSessions = sessions.filter(s => s.success).length;
+                const csatScore = sessions.length > 0 
+                    ? ((successfulSessions / sessions.length) * 100).toFixed(1)
+                    : 0;
+                
+                // Actualizar elementos
+                document.getElementById('total-sessions').textContent = sessions.length;
+                document.getElementById('csat-score').textContent = `${csatScore}%`;
+                document.getElementById('csat-badge').innerHTML = `<span class="relative z-10">${csatScore}%</span>`;
+                document.getElementById('csat-badge').style.setProperty('--p', `${csatScore}%`);
+                
+                // Actualizar barra de éxito
+                document.getElementById('success-rate').textContent = `${csatScore}%`;
+                document.getElementById('success-bar').style.width = `${csatScore}%`;
+                
+                // Calcular costos (simulado)
+                const userCost = (Math.random() * 15).toFixed(2);
+                const assistantCost = (Math.random() * 35).toFixed(2);
+                const totalCost = (parseFloat(userCost) + parseFloat(assistantCost)).toFixed(2);
+                
+                document.getElementById('total-cost').textContent = totalCost;
+                document.getElementById('user-cost').textContent = userCost;
+                document.getElementById('assistant-cost').textContent = assistantCost;
+                
+                // Actualizar temas principales
+                const topics = this.getPopularTopics(sessions);
+                document.getElementById('top-topics-count').textContent = topics.length;
+                if (topics.length > 0) {
+                    document.getElementById('topic-1').textContent = topics[0].topic;
+                    document.getElementById('topic-2').textContent = topics.length > 1 ? topics[1].topic : 'N/A';
+                }
+            },
+            
+            getPopularTopics(sessions) {
+                const topicCounts = {};
+                
+                sessions.forEach(session => {
+                    const topic = session.topic || 'Sin tema';
+                    topicCounts[topic] = (topicCounts[topic] || 0) + 1;
+                });
+                
+                return Object.entries(topicCounts)
+                    .map(([topic, count]) => ({ topic, count }))
+                    .sort((a, b) => b.count - a.count)
+                    .slice(0, 6);
+            },
+            
+            renderTopicsChart(sessions) {
+                const topicsData = this.getPopularTopics(sessions);
+                const ctx = document.getElementById('topicsChart').getContext('2d');
+                
+                // Destruir gráfico existente si hay uno
+                if (window.topicsChart) window.topicsChart.destroy();
+                
+                window.topicsChart = new Chart(ctx, {
+                    type: 'doughnut',
+                    data: {
+                        labels: topicsData.map(t => t.topic),
+                        datasets: [{
+                            data: topicsData.map(t => t.count),
+                            backgroundColor: [
+                                '#4361ee', '#3a0ca3', '#7209b7', '#f72585', '#4cc9f0', '#4895ef',
+                                '#560bad', '#b5179e', '#480ca8', '#3f37c9'
+                            ],
+                            borderWidth: 0,
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: true,
+                        plugins: {
+                            legend: {
+                                position: 'right',
+                                labels: {
+                                    boxWidth: 15,
+                                    padding: 15,
+                                    font: {
+                                        size: 12
+                                    }
+                                }
+                            }
+                        },
+                        cutout: '65%'
+                    }
+                });
+            },
+            
+            renderSessionsOverTimeChart(sessions) {
+                // Agrupar sesiones por fecha
+                const dateCounts = {};
+                
+                sessions.forEach(session => {
+                    const date = new Date(session.created_at).toLocaleDateString('es-ES', {
+                        month: 'short',
+                        day: 'numeric'
+                    });
+                    dateCounts[date] = (dateCounts[date] || 0) + 1;
+                });
+                
+                const dates = Object.keys(dateCounts);
+                const counts = dates.map(date => dateCounts[date]);
+                
+                const ctx = document.getElementById('sessionsOverTimeChart').getContext('2d');
+                
+                // Destruir gráfico existente si hay uno
+                if (window.sessionsOverTimeChart) window.sessionsOverTimeChart.destroy();
+                
+                window.sessionsOverTimeChart = new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: dates,
+                        datasets: [{
+                            label: 'Sesiones',
+                            data: counts,
+                            borderColor: '#4361ee',
+                            backgroundColor: 'rgba(67, 97, 238, 0.1)',
+                            borderWidth: 3,
+                            pointRadius: 5,
+                            pointBackgroundColor: '#fff',
+                            pointBorderColor: '#4361ee',
+                            pointBorderWidth: 2,
+                            tension: 0.3,
+                            fill: true
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: true,
+                        plugins: {
+                            legend: {
+                                display: false
+                            }
+                        },
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                grid: {
+                                    color: 'rgba(0, 0, 0, 0.05)'
+                                },
+                                ticks: {
+                                    precision: 0
+                                }
+                            },
+                            x: {
+                                grid: {
+                                    display: false
+                                }
+                            }
+                        }
+                    }
+                });
+            },
+            
+            renderUserSessionsChart(sessions) {
+                // Simular datos de usuarios
+                const users = [
+                    { name: 'Juan Pérez', sessions: Math.floor(Math.random() * 30) + 10 },
+                    { name: 'María García', sessions: Math.floor(Math.random() * 25) + 8 },
+                    { name: 'Carlos López', sessions: Math.floor(Math.random() * 20) + 5 },
+                    { name: 'Ana Martínez', sessions: Math.floor(Math.random() * 18) + 5 },
+                    { name: 'Pedro Rodríguez', sessions: Math.floor(Math.random() * 15) + 3 }
+                ];
+                
+                // Ordenar usuarios por sesiones
+                users.sort((a, b) => b.sessions - a.sessions);
+                
+                const ctx = document.getElementById('userSessionsChart').getContext('2d');
+                
+                // Destruir gráfico existente si hay uno
+                if (window.userSessionsChart) window.userSessionsChart.destroy();
+                
+                window.userSessionsChart = new Chart(ctx, {
+                    type: 'bar',
+                    data: {
+                        labels: users.map(u => u.name),
+                        datasets: [{
+                            label: 'Sesiones',
+                            data: users.map(u => u.sessions),
+                            backgroundColor: '#4361ee',
+                            borderRadius: 6,
+                            borderSkipped: false,
+                        }]
+                    },
+                    options: {
+                        indexAxis: 'y',
+                        responsive: true,
+                        maintainAspectRatio: true,
+                        plugins: {
+                            legend: {
+                                display: false
+                            }
+                        },
+                        scales: {
+                            x: {
+                                grid: {
+                                    color: 'rgba(0, 0, 0, 0.05)'
+                                },
+                                beginAtZero: true
+                            },
+                            y: {
+                                grid: {
+                                    display: false
+                                }
+                            }
+                        }
+                    }
+                });
+            },
+            
+            showLoading() {
+                document.getElementById('loading').classList.remove('hidden');
+            },
+            
+            hideLoading() {
+                document.getElementById('loading').classList.add('hidden');
+            },
+            
+            showError(message) {
+                document.getElementById('error-message').textContent = message;
+                document.getElementById('error').classList.remove('hidden');
+            },
+            
+            hideError() {
+                document.getElementById('error').classList.add('hidden');
+            },
+            
+            showDashboard() {
+                document.getElementById('dashboard').classList.remove('hidden');
+            },
+            
+            hideDashboard() {
+                document.getElementById('dashboard').classList.add('hidden');
+            }
+        };
+        
+        // Inicializar el dashboard cuando el documento esté listo
+        document.addEventListener('DOMContentLoaded', () => dashboard.init());
+    </script>
+</body>
+</html>
