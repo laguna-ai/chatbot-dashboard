@@ -479,6 +479,9 @@ const dashboard = {
         bubblesContainer.classList.add('conversation-container');
         
         history.forEach((message, index) => {
+            // Filtrar mensajes de sistema
+            if (message.role === "system") return;
+
             const bubble = document.createElement('div');
             bubble.classList.add('message-bubble');
             bubble.classList.add(message.role === 'user' ? 'user-bubble' : 'assistant-bubble');
