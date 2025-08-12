@@ -169,3 +169,137 @@ body {
     width: 100% !important;
     height: 100% !important;
 }
+
+/* Estilos para la lista de sesiones */
+.session-item {
+    padding: 1rem;
+    cursor: pointer;
+    border-bottom: 1px solid #e9ecef;
+    transition: background-color 0.2s;
+}
+
+.session-item:hover {
+    background-color: #f8f9fa;
+}
+
+.session-item.active {
+    background-color: #e3f2fd;
+    border-left: 4px solid var(--primary);
+}
+
+.session-header {
+    display: flex;
+    justify-content: space-between;
+    font-weight: 600;
+    margin-bottom: 0.25rem;
+}
+
+.session-topic {
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: #2d3748;
+}
+
+.session-date {
+    font-size: 0.8rem;
+    color: #718096;
+}
+
+.session-preview {
+    font-size: 0.85rem;
+    color: #4a5568;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* Estilos para el mensaje de "no conversación" */
+#no-conversation-message {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+}
+
+
+/* Estilos mejorados para las burbujas de chat */
+.conversation-container {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    padding: 1rem;
+    
+}
+
+.message-bubble {
+    max-width: 80%;
+    padding: 0.75rem 1rem;
+    border-radius: 18px;
+    position: relative;
+    animation: fadeIn 0.3s ease-out;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+}
+
+.user-bubble {
+    background-color: #dcf8c6;
+    align-self: flex-end;
+    border-bottom-right-radius: 4px;
+}
+
+.assistant-bubble {
+    background-color: #ffffff;
+    align-self: flex-start;
+    border-bottom-left-radius: 4px;
+    border: 1px solid #f0f0f0;
+}
+
+.message-content {
+    font-size: 0.95rem;
+    line-height: 1.4;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+}
+
+.message-info {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 0.5rem;
+    font-size: 0.75rem;
+    color: #718096;
+}
+
+.message-tokens {
+    background-color: rgba(0,0,0,0.05);
+    padding: 0.1rem 0.5rem;
+    border-radius: 12px;
+}
+
+.message-time {
+    text-align: right;
+}
+
+/* Animación para la aparición de mensajes */
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+/* Estilo para el encabezado de conversación */
+#conversation-header {
+    background-color: #f8f9fa;
+    padding: 1rem 1.5rem;
+    border-bottom: 1px solid #e9ecef;
+    display: flex;
+    flex-direction: column;
+}
+
+#selected-session-topic {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: #2d3748;
+}
+
+#selected-session-date {
+    font-size: 0.85rem;
+    color: #718096;
+}

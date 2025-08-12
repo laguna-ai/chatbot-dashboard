@@ -8,6 +8,7 @@ let userSessionsChart = null;
 
 // Controlador del Dashboard
 const dashboard = {
+    currentSesssions : [],
     async init() {
         // Configurar fecha actual
         setCurrentDate();
@@ -37,6 +38,8 @@ const dashboard = {
     },
     
     renderDashboard(sessions, users) {
+
+        this.currentSesssions = sessions;
         // Actualizar estadísticas
         this.updateStats(sessions);
         
@@ -48,6 +51,9 @@ const dashboard = {
         // Mostrar dashboard
         this.hideLoading();
         this.showDashboard();
+
+        // Poblar la lista de sesiones
+        this.populateSessionsList(sessions);
     },
     
     updateStats(sessions) {
@@ -351,7 +357,177 @@ const dashboard = {
     
     hideDashboard() {
         hideElement('dashboard');
-    }
+    },
+
+
+    // Función para popular la lista de sesiones
+    populateSessionsList(sessions) {
+        const container = document.getElementById('sessions-list');
+        if (!container) return; // Verificar si el contenedor existe
+        
+        container.innerHTML = '';
+        
+        // Almacenar las sesiones actuales para referencia futura
+        this.currentSessions = sessions;
+        
+        // Ordenar sesiones por fecha (más reciente primero)
+        const sortedSessions = [...sessions].sort((a, b) => 
+            new Date(b.created_at) - new Date(a.created_at)
+        );
+        
+        sortedSessions.forEach(session => {
+            const sessionElement = document.createElement('div');
+            sessionElement.classList.add('session-item');
+            sessionElement.dataset.sessionId = session.id;
+            
+            const date = new Date(session.created_at).toLocaleDateString();
+            const topic = session.topic || 'Sin tema';
+            
+            // Obtener el último mensaje para el preview
+            let preview = 'No hay mensajes';
+            if (session.history && session.history.length > 0) {
+                const lastMessage = session.history[session.history.length - 1];
+                preview = lastMessage.content.substring(0, 50) + (lastMessage.content.length > 50 ? '...' : '');
+            }
+            
+            sessionElement.innerHTML = `
+                <div class="session-header">
+                    <div class="session-topic">${topic}</div>
+                    <div class="session-date">${date}</div>
+                </div>
+                <div class="session-preview">${preview}</div>
+            `;
+            
+            sessionElement.addEventListener('click', () => {
+                // Buscar la sesión actual por ID en las sesiones almacenadas
+                const sessionId = sessionElement.dataset.sessionId;
+                const currentSession = this.currentSessions.find(s => s.id === sessionId);
+                
+                if (!currentSession) return;
+                
+                const currentDate = new Date(currentSession.created_at).toLocaleDateString();
+                const currentTopic = currentSession.topic || 'Sin tema';
+                
+                // Remover clase activa de todos los elementos
+                document.querySelectorAll('.session-item').forEach(item => {
+                    item.classList.remove('active');
+                });
+                
+                // Agregar clase activa al elemento seleccionado
+                sessionElement.classList.add('active');
+                
+                // Actualizar encabezado de conversación (verificar si existe)
+                const selectedTopicEl = document.getElementById('selected-session-topic');
+                const selectedDateEl = document.getElementById('selected-session-date');
+                const conversationHeader = document.getElementById('conversation-header');
+                
+                if (selectedTopicEl) selectedTopicEl.textContent = currentTopic;
+                if (selectedDateEl) selectedDateEl.textContent = `Iniciada el ${currentDate}`;
+                if (conversationHeader) conversationHeader.classList.remove('hidden');
+                
+                // Mostrar la conversación
+                this.renderConversationHistory(currentSession.history || []);
+            });
+            
+            container.appendChild(sessionElement);
+        });
+        
+        // Evento para búsqueda
+        const searchInput = document.getElementById('session-search');
+        if (searchInput) {
+            searchInput.addEventListener('input', (e) => {
+                const searchTerm = e.target.value.toLowerCase();
+                const sessionItems = container.querySelectorAll('.session-item');
+                
+                sessionItems.forEach(item => {
+                    const topic = item.querySelector('.session-topic').textContent.toLowerCase();
+                    const preview = item.querySelector('.session-preview').textContent.toLowerCase();
+                    if (topic.includes(searchTerm) || preview.includes(searchTerm)) {
+                        item.style.display = 'block';
+                    } else {
+                        item.style.display = 'none';
+                    }
+                });
+            });
+        }
+    },
+
+    // Función para renderizar el historial de conversación
+    renderConversationHistory(history) {
+        const container = document.getElementById('conversation-container');
+        const noConversationMessage = document.getElementById('no-conversation-message');
+        
+        // Verificar si los elementos existen antes de manipularlos
+        if (!container) return;
+        
+        if (!history || history.length === 0) {
+            if (noConversationMessage) {
+                noConversationMessage.style.display = 'flex';
+            }
+            container.innerHTML = '';
+            return;
+        }
+        
+        if (noConversationMessage) {
+            noConversationMessage.style.display = 'none';
+        }
+        
+        container.innerHTML = '';
+        
+        // Crear contenedor para las burbujas
+        const bubblesContainer = document.createElement('div');
+        bubblesContainer.classList.add('conversation-container');
+        
+        history.forEach((message, index) => {
+            const bubble = document.createElement('div');
+            bubble.classList.add('message-bubble');
+            bubble.classList.add(message.role === 'user' ? 'user-bubble' : 'assistant-bubble');
+            
+            // Añadir animación con retardo escalonado
+            bubble.style.animationDelay = `${index * 0.1}s`;
+            
+            // Contenido del mensaje
+            const content = document.createElement('div');
+            content.classList.add('message-content');
+            content.textContent = message.content;
+            
+            // Información adicional (tokens y timestamp)
+            const info = document.createElement('div');
+            info.classList.add('message-info');
+            
+            const tokens = document.createElement('span');
+            tokens.classList.add('message-tokens');
+            tokens.textContent = `${message.tokens || 0} tokens`;
+            
+            const time = document.createElement('span');
+            time.classList.add('message-time');
+            
+            // Verificar si timestamp existe y es válido
+            if (message.timestamp) {
+                time.textContent = new Date(message.timestamp * 1000).toLocaleTimeString([], {
+                    hour: '2-digit', 
+                    minute: '2-digit'
+                });
+            } else {
+                time.textContent = '--:--';
+            }
+            
+            info.appendChild(tokens);
+            info.appendChild(time);
+            
+            bubble.appendChild(content);
+            bubble.appendChild(info);
+            bubblesContainer.appendChild(bubble);
+        });
+        
+        container.appendChild(bubblesContainer);
+        
+        // Scroll al final de la conversación
+        container.scrollTop = container.scrollHeight;
+    },
+
+
+
 };
 
 // Inicializar el dashboard cuando el documento esté listo

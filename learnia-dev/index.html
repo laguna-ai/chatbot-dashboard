@@ -175,6 +175,46 @@
                     <canvas id="userSessionsChart" class="chart-canvas"></canvas>
                 </div>
             </div>
+
+            <!-- Conversations Widget -->
+            <div class="chart-container fade-in mb-8" style="animation-delay: 0.7s">
+                <div class="chart-header">
+                    <h2 class="text-xl font-bold text-gray-800">Conversaciones</h2>
+                    <p class="text-gray-600">Historial de mensajes por sesión</p>
+                </div>
+                <div class="flex flex-col md:flex-row overflow-y-auto" style="min-height: 500px;">
+                    <!-- Lista de sesiones (lateral izquierda) -->
+                    <div class="w-full md:w-1/3 border-r border-gray-200 overflow-y-auto">
+                        <div class="p-2">
+                            <input 
+                                type="text" 
+                                id="session-search" 
+                                placeholder="Buscar sesión..." 
+                                class="w-full p-2 border border-gray-300 rounded-lg mb-2 focus:ring-primary focus:border-primary"
+                            >
+                        </div>
+                        <div class="flex-1 overflow-y-auto" style="max-height: 400px;"> <!-- Contenedor scrollable -->
+                            <div id="sessions-list" class="space-y-1">
+                                <!-- Las sesiones se listarán aquí -->
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Área de conversación (derecha) -->
+                    <div class="w-full md:w-2/3" style="max-height: 388px;">
+                        <div id="conversation-header" class="p-4 border-b border-gray-200 hidden">
+                            <h3 id="selected-session-topic" class="font-semibold text-gray-800"></h3>
+                            <p id="selected-session-date" class="text-sm text-gray-500"></p>
+                        </div>
+                        <div id="conversation-container" class="p-4 h-full overflow-y-auto">
+                            <div class="text-center text-gray-500 py-4" id="no-conversation-message">
+                                Selecciona una sesión para ver la conversación
+                            </div>
+                            <!-- La conversación se mostrará aquí -->
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
     </main>
 
