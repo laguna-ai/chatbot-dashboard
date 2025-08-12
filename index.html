@@ -21,6 +21,7 @@
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             background: linear-gradient(135deg, #f5f7fa 0%, #e4e7f1 100%);
             min-height: 100vh;
+            overflow-x: hidden;
         }
         
         .dashboard-header {
@@ -114,9 +115,78 @@
             from { opacity: 0; transform: translateY(20px); }
             to { opacity: 1; transform: translateY(0); }
         }
+        
+        .refresh-btn {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: white;
+            border: none;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            cursor: pointer;
+            transition: all 0.3s ease;
+            z-index: 10;
+        }
+        
+        .refresh-btn:hover {
+            transform: rotate(30deg);
+            background: #f0f5ff;
+        }
+        
+        .loading-bar {
+            height: 4px;
+            width: 100%;
+            background-color: #e0e0e0;
+            position: relative;
+            overflow: hidden;
+            border-radius: 2px;
+        }
+        
+        .loading-bar::before {
+            content: '';
+            position: absolute;
+            height: 100%;
+            width: 50%;
+            background-color: #4361ee;
+            animation: loading 1.5s infinite ease-in-out;
+        }
+        
+        @keyframes loading {
+            0% { left: -50%; }
+            100% { left: 150%; }
+        }
+        
+        /* SOLUCIÓN AL PROBLEMA DE DESBORDAMIENTO */
+        .chart-wrapper {
+            position: relative;
+            height: 300px;
+            width: 100%;
+        }
+        
+        .large-chart-wrapper {
+            position: relative;
+            height: 400px;
+            width: 100%;
+        }
+        
+        .chart-canvas {
+            width: 100% !important;
+            height: 100% !important;
+        }
     </style>
 </head>
 <body class="min-h-screen">
+    <!-- Botón de recargar -->
+    <button class="refresh-btn" id="refresh-btn">
+        <i class="fas fa-sync-alt text-blue-600"></i>
+    </button>
+
     <header class="dashboard-header text-white py-6 px-6 lg:px-12">
         <div class="container mx-auto flex flex-col md:flex-row justify-between items-center">
             <div class="flex items-center mb-4 md:mb-0">
@@ -141,6 +211,9 @@
         <div id="loading" class="text-center py-12">
             <div class="inline-block animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500 mb-4"></div>
             <p class="text-gray-600 font-medium">Cargando datos del dashboard...</p>
+            <div class="mt-6 max-w-md mx-auto">
+                <div class="loading-bar"></div>
+            </div>
         </div>
         
         <!-- Error State -->
@@ -182,7 +255,7 @@
                             <p class="text-gray-500 font-medium">Tasa CSAT</p>
                             <div class="flex items-center mt-3">
                                 <div class="csat-badge mr-4" id="csat-badge">
-                                    <span class="relative z-10">0%</span>
+                                    <span class="relative z-10" id="csat-value">0%</span>
                                 </div>
                                 <div>
                                     <h2 class="text-3xl font-bold" id="csat-score">0%</h2>
@@ -248,7 +321,10 @@
                         <h2 class="text-xl font-bold text-gray-800">Tópicos más populares</h2>
                         <p class="text-gray-600">Distribución de temas tratados en las sesiones</p>
                     </div>
-                    <canvas id="topicsChart"></canvas>
+                    <!-- SOLUCIÓN: Contenedor con altura fija -->
+                    <div class="chart-wrapper">
+                        <canvas id="topicsChart" class="chart-canvas"></canvas>
+                    </div>
                 </div>
                 
                 <!-- Sessions Over Time -->
@@ -257,7 +333,10 @@
                         <h2 class="text-xl font-bold text-gray-800">Sesiones en el tiempo</h2>
                         <p class="text-gray-600">Evolución de la actividad diaria</p>
                     </div>
-                    <canvas id="sessionsOverTimeChart"></canvas>
+                    <!-- SOLUCIÓN: Contenedor con altura fija -->
+                    <div class="chart-wrapper">
+                        <canvas id="sessionsOverTimeChart" class="chart-canvas"></canvas>
+                    </div>
                 </div>
             </div>
             
@@ -267,13 +346,21 @@
                     <h2 class="text-xl font-bold text-gray-800">Sesiones por usuario</h2>
                     <p class="text-gray-600">Usuarios más activos en el sistema</p>
                 </div>
-                <canvas id="userSessionsChart"></canvas>
+                <!-- SOLUCIÓN: Contenedor con altura fija más grande -->
+                <div class="large-chart-wrapper">
+                    <canvas id="userSessionsChart" class="chart-canvas"></canvas>
+                </div>
             </div>
         </div>
     </main>
 
     <script>
-        // Set current date
+        // Variables para almacenar referencias de gráficos
+        let topicsChart = null;
+        let sessionsOverTimeChart = null;
+        let userSessionsChart = null;
+        
+        // Configuración de fecha actual
         document.getElementById('current-date').textContent = new Date().toLocaleDateString('es-ES', {
             weekday: 'long',
             year: 'numeric',
@@ -281,15 +368,28 @@
             day: 'numeric'
         });
         
-        // API Service
+        // Servicio API para obtener datos reales
         const apiService = {
-            baseUrl: 'https://api.example.com', // Reemplazar con la URL real de la API
+            baseUrl: "http://localhost:7071", // Usar la misma URL de origen
             
             async getSessions() {
                 try {
-                    const response = await fetch(`${this.baseUrl}/api/sessions`);
+                    const response = await fetch(`${this.baseUrl}/api/get_sessions`);
                     if (!response.ok) {
                         throw new Error('Error obteniendo sesiones');
+                    }
+                    return await response.json();
+                } catch (error) {
+                    console.error('Error:', error);
+                    throw error;
+                }
+            },
+            
+            async getUsers() {
+                try {
+                    const response = await fetch(`${this.baseUrl}/api/get_users`);
+                    if (!response.ok) {
+                        throw new Error('Error obteniendo usuarios');
                     }
                     return await response.json();
                 } catch (error) {
@@ -299,11 +399,12 @@
             }
         };
         
-        // Dashboard Controller
+        // Controlador del Dashboard
         const dashboard = {
-            init() {
+            async init() {
                 this.loadData();
                 document.getElementById('retry-btn').addEventListener('click', () => this.loadData());
+                document.getElementById('refresh-btn').addEventListener('click', () => this.loadData());
             },
             
             async loadData() {
@@ -312,21 +413,25 @@
                 this.hideDashboard();
                 
                 try {
+                    // Obtener datos reales de la API
                     const sessions = await apiService.getSessions();
-                    this.renderDashboard(sessions);
+                    const users = await apiService.getUsers();
+                    
+                    // Procesar y mostrar datos
+                    this.renderDashboard(sessions, users);
                 } catch (error) {
                     this.showError(error.message);
                 }
             },
             
-            renderDashboard(sessions) {
+            renderDashboard(sessions, users) {
                 // Actualizar estadísticas
                 this.updateStats(sessions);
                 
                 // Renderizar gráficos
                 this.renderTopicsChart(sessions);
                 this.renderSessionsOverTimeChart(sessions);
-                this.renderUserSessionsChart(sessions);
+                this.renderUserSessionsChart(users);
                 
                 // Mostrar dashboard
                 this.hideLoading();
@@ -343,21 +448,18 @@
                 // Actualizar elementos
                 document.getElementById('total-sessions').textContent = sessions.length;
                 document.getElementById('csat-score').textContent = `${csatScore}%`;
-                document.getElementById('csat-badge').innerHTML = `<span class="relative z-10">${csatScore}%</span>`;
+                document.getElementById('csat-value').textContent = `${csatScore}%`;
                 document.getElementById('csat-badge').style.setProperty('--p', `${csatScore}%`);
                 
                 // Actualizar barra de éxito
                 document.getElementById('success-rate').textContent = `${csatScore}%`;
                 document.getElementById('success-bar').style.width = `${csatScore}%`;
                 
-                // Calcular costos (simulado)
-                const userCost = (Math.random() * 15).toFixed(2);
-                const assistantCost = (Math.random() * 35).toFixed(2);
-                const totalCost = (parseFloat(userCost) + parseFloat(assistantCost)).toFixed(2);
-                
-                document.getElementById('total-cost').textContent = totalCost;
-                document.getElementById('user-cost').textContent = userCost;
-                document.getElementById('assistant-cost').textContent = assistantCost;
+                // Calcular costos de OpenAI
+                const costs = this.calculateOpenAICosts(sessions);
+                document.getElementById('total-cost').textContent = costs.totalCost;
+                document.getElementById('user-cost').textContent = costs.userCost;
+                document.getElementById('assistant-cost').textContent = costs.assistantCost;
                 
                 // Actualizar temas principales
                 const topics = this.getPopularTopics(sessions);
@@ -366,6 +468,38 @@
                     document.getElementById('topic-1').textContent = topics[0].topic;
                     document.getElementById('topic-2').textContent = topics.length > 1 ? topics[1].topic : 'N/A';
                 }
+            },
+            
+            calculateOpenAICosts(sessions) {
+                let userTokens = 0;
+                let assistantTokens = 0;
+
+                sessions.forEach((session) => {
+                    try {
+                        const history = session.history || [];
+                        history.forEach((message) => {
+                            if (message.role === "user") {
+                                userTokens += message.tokens || 0;
+                            } else if (message.role === "assistant") {
+                                assistantTokens += message.tokens || 0;
+                            }
+                        });
+                    } catch (e) {
+                        console.error("Error parsing history:", e);
+                    }
+                });
+
+                const userCost = (userTokens / 1000000) * 2.5;
+                const assistantCost = (assistantTokens / 1000000) * 10;
+                const totalCost = userCost + assistantCost;
+
+                return {
+                    userTokens,
+                    assistantTokens,
+                    userCost: userCost.toFixed(4),
+                    assistantCost: assistantCost.toFixed(4),
+                    totalCost: totalCost.toFixed(4),
+                };
             },
             
             getPopularTopics(sessions) {
@@ -387,9 +521,11 @@
                 const ctx = document.getElementById('topicsChart').getContext('2d');
                 
                 // Destruir gráfico existente si hay uno
-                if (window.topicsChart) window.topicsChart.destroy();
+                if (topicsChart) {
+                    topicsChart.destroy();
+                }
                 
-                window.topicsChart = new Chart(ctx, {
+                topicsChart = new Chart(ctx, {
                     type: 'doughnut',
                     data: {
                         labels: topicsData.map(t => t.topic),
@@ -404,7 +540,7 @@
                     },
                     options: {
                         responsive: true,
-                        maintainAspectRatio: true,
+                        maintainAspectRatio: false, // Importante para evitar desbordamiento
                         plugins: {
                             legend: {
                                 position: 'right',
@@ -413,6 +549,13 @@
                                     padding: 15,
                                     font: {
                                         size: 12
+                                    }
+                                }
+                            },
+                            tooltip: {
+                                callbacks: {
+                                    label: function(context) {
+                                        return `${context.label}: ${context.parsed} sesiones`;
                                     }
                                 }
                             }
@@ -427,22 +570,24 @@
                 const dateCounts = {};
                 
                 sessions.forEach(session => {
-                    const date = new Date(session.created_at).toLocaleDateString('es-ES', {
-                        month: 'short',
-                        day: 'numeric'
-                    });
+                    const date = new Date(session.created_at).toISOString().split('T')[0];
                     dateCounts[date] = (dateCounts[date] || 0) + 1;
                 });
                 
-                const dates = Object.keys(dateCounts);
+                // Ordenar fechas cronológicamente
+                const dates = Object.keys(dateCounts).sort((a, b) => 
+                    new Date(a) - new Date(b)
+                );
                 const counts = dates.map(date => dateCounts[date]);
                 
                 const ctx = document.getElementById('sessionsOverTimeChart').getContext('2d');
                 
                 // Destruir gráfico existente si hay uno
-                if (window.sessionsOverTimeChart) window.sessionsOverTimeChart.destroy();
+                if (sessionsOverTimeChart) {
+                    sessionsOverTimeChart.destroy();
+                }
                 
-                window.sessionsOverTimeChart = new Chart(ctx, {
+                sessionsOverTimeChart = new Chart(ctx, {
                     type: 'line',
                     data: {
                         labels: dates,
@@ -462,10 +607,20 @@
                     },
                     options: {
                         responsive: true,
-                        maintainAspectRatio: true,
+                        maintainAspectRatio: false, // Importante para evitar desbordamiento
                         plugins: {
                             legend: {
                                 display: false
+                            },
+                            tooltip: {
+                                callbacks: {
+                                    title: function(tooltipItems) {
+                                        return tooltipItems[0].label;
+                                    },
+                                    label: function(context) {
+                                        return `Sesiones: ${context.parsed.y}`;
+                                    }
+                                }
                             }
                         },
                         scales: {
@@ -488,31 +643,27 @@
                 });
             },
             
-            renderUserSessionsChart(sessions) {
-                // Simular datos de usuarios
-                const users = [
-                    { name: 'Juan Pérez', sessions: Math.floor(Math.random() * 30) + 10 },
-                    { name: 'María García', sessions: Math.floor(Math.random() * 25) + 8 },
-                    { name: 'Carlos López', sessions: Math.floor(Math.random() * 20) + 5 },
-                    { name: 'Ana Martínez', sessions: Math.floor(Math.random() * 18) + 5 },
-                    { name: 'Pedro Rodríguez', sessions: Math.floor(Math.random() * 15) + 3 }
-                ];
-                
-                // Ordenar usuarios por sesiones
-                users.sort((a, b) => b.sessions - a.sessions);
+            renderUserSessionsChart(users) {
+                // Procesar datos de usuarios
+                const userData = users.map(user => ({
+                    name: user.nickname || 'Usuario desconocido',
+                    sessions: user.session_count || 0
+                })).sort((a, b) => b.sessions - a.sessions).slice(0, 10);
                 
                 const ctx = document.getElementById('userSessionsChart').getContext('2d');
                 
                 // Destruir gráfico existente si hay uno
-                if (window.userSessionsChart) window.userSessionsChart.destroy();
+                if (userSessionsChart) {
+                    userSessionsChart.destroy();
+                }
                 
-                window.userSessionsChart = new Chart(ctx, {
+                userSessionsChart = new Chart(ctx, {
                     type: 'bar',
                     data: {
-                        labels: users.map(u => u.name),
+                        labels: userData.map(u => u.name),
                         datasets: [{
                             label: 'Sesiones',
-                            data: users.map(u => u.sessions),
+                            data: userData.map(u => u.sessions),
                             backgroundColor: '#4361ee',
                             borderRadius: 6,
                             borderSkipped: false,
@@ -521,10 +672,20 @@
                     options: {
                         indexAxis: 'y',
                         responsive: true,
-                        maintainAspectRatio: true,
+                        maintainAspectRatio: false, // Importante para evitar desbordamiento
                         plugins: {
                             legend: {
                                 display: false
+                            },
+                            tooltip: {
+                                callbacks: {
+                                    title: function(tooltipItems) {
+                                        return tooltipItems[0].label;
+                                    },
+                                    label: function(context) {
+                                        return `Sesiones: ${context.parsed.x}`;
+                                    }
+                                }
                             }
                         },
                         scales: {
@@ -532,11 +693,20 @@
                                 grid: {
                                     color: 'rgba(0, 0, 0, 0.05)'
                                 },
-                                beginAtZero: true
+                                beginAtZero: true,
+                                title: {
+                                    display: true,
+                                    text: 'Número de sesiones'
+                                }
                             },
                             y: {
                                 grid: {
                                     display: false
+                                },
+                                ticks: {
+                                    autoSkip: false,
+                                    maxRotation: 45,
+                                    minRotation: 45
                                 }
                             }
                         }
