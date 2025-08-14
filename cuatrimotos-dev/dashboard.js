@@ -1,9 +1,10 @@
-import { getSessions } from './apiService.js';
-import { showElement, hideElement, showError, setCurrentDate, addEventListeners,formatMessage } from './domUtils.js';
+import { getSessions, getUsers } from './apiService.js';
+import { showElement, hideElement, showError, setCurrentDate, addEventListeners } from './domUtils.js';
 
 // Variables para almacenar referencias de gráficos
 let topicsChart = null;
 let sessionsOverTimeChart = null;
+let userSessionsChart = null;
 
 // Controlador del Dashboard
 const dashboard = {
@@ -27,15 +28,16 @@ const dashboard = {
         try {
             // Obtener datos reales de la API
             const sessions = await getSessions();
+            const users = await getUsers();
             
             // Procesar y mostrar datos
-            this.renderDashboard(sessions);
+            this.renderDashboard(sessions, users);
         } catch (error) {
             this.showError(error.message);
         }
     },
     
-    renderDashboard(sessions) {
+    renderDashboard(sessions, users) {
 
         this.currentSesssions = sessions;
         // Actualizar estadísticas
@@ -44,6 +46,7 @@ const dashboard = {
         // Renderizar gráficos
         this.renderTopicsChart(sessions);
         this.renderSessionsOverTimeChart(sessions);
+        this.renderUserSessionsChart(users);
         
         // Mostrar dashboard
         this.hideLoading();
@@ -69,7 +72,12 @@ const dashboard = {
         document.getElementById('success-rate').textContent = `${csatScore}%`;
         document.getElementById('success-bar').style.width = `${csatScore}%`;
         
- 
+        // Calcular costos de OpenAI
+        const costs = this.calculateOpenAICosts(sessions);
+        document.getElementById('total-cost').textContent = costs.totalCost;
+        document.getElementById('user-cost').textContent = costs.userCost;
+        document.getElementById('assistant-cost').textContent = costs.assistantCost;
+        
         // Actualizar temas principales
         const topics = this.getPopularTopics(sessions);
         document.getElementById('top-topics-count').textContent = topics.length;
@@ -79,6 +87,37 @@ const dashboard = {
         }
     },
     
+    calculateOpenAICosts(sessions) {
+        let userTokens = 0;
+        let assistantTokens = 0;
+
+        sessions.forEach((session) => {
+            try {
+                const history = session.history || [];
+                history.forEach((message) => {
+                    if (message.role === "user") {
+                        userTokens += message.tokens || 0;
+                    } else if (message.role === "assistant") {
+                        assistantTokens += message.tokens || 0;
+                    }
+                });
+            } catch (e) {
+                console.error("Error parsing history:", e);
+            }
+        });
+
+        const userCost = (userTokens / 1000000) * 2.5;
+        const assistantCost = (assistantTokens / 1000000) * 10;
+        const totalCost = userCost + assistantCost;
+
+        return {
+            userTokens,
+            assistantTokens,
+            userCost: userCost.toFixed(4),
+            assistantCost: assistantCost.toFixed(4),
+            totalCost: totalCost.toFixed(4),
+        };
+    },
     
     getPopularTopics(sessions) {
         const topicCounts = {};
@@ -221,6 +260,76 @@ const dashboard = {
         });
     },
     
+    renderUserSessionsChart(users) {
+        // Procesar datos de usuarios
+        const userData = users.map(user => ({
+            name: user.nickname || 'Usuario desconocido',
+            sessions: user.session_count || 0
+        })).sort((a, b) => b.sessions - a.sessions).slice(0, 10);
+        
+        const ctx = document.getElementById('userSessionsChart').getContext('2d');
+        
+        // Destruir gráfico existente si hay uno
+        if (userSessionsChart) {
+            userSessionsChart.destroy();
+        }
+        
+        userSessionsChart = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: userData.map(u => u.name),
+                datasets: [{
+                    label: 'Sesiones',
+                    data: userData.map(u => u.sessions),
+                    backgroundColor: '#4361ee',
+                    borderRadius: 6,
+                    borderSkipped: false,
+                }]
+            },
+            options: {
+                indexAxis: 'y',
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        display: false
+                    },
+                    tooltip: {
+                        callbacks: {
+                            title: function(tooltipItems) {
+                                return tooltipItems[0].label;
+                            },
+                            label: function(context) {
+                                return `Sesiones: ${context.parsed.x}`;
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    x: {
+                        grid: {
+                            color: 'rgba(0, 0, 0, 0.05)'
+                        },
+                        beginAtZero: true,
+                        title: {
+                            display: true,
+                            text: 'Número de sesiones'
+                        }
+                    },
+                    y: {
+                        grid: {
+                            display: false
+                        },
+                        ticks: {
+                            autoSkip: false,
+                            maxRotation: 45,
+                            minRotation: 45
+                        }
+                    }
+                }
+            }
+        });
+    },
     
     showLoading() {
         hideElement('error');
@@ -383,13 +492,16 @@ const dashboard = {
             // Contenido del mensaje
             const content = document.createElement('div');
             content.classList.add('message-content');
-            content.innerHTML = formatMessage(message.content); // Formatear el contenido del message.content;
+            content.textContent = message.content;
             
             // Información adicional (tokens y timestamp)
             const info = document.createElement('div');
             info.classList.add('message-info');
             
-                        
+            const tokens = document.createElement('span');
+            tokens.classList.add('message-tokens');
+            tokens.textContent = `${message.tokens || 0} tokens`;
+            
             const time = document.createElement('span');
             time.classList.add('message-time');
             
@@ -403,6 +515,7 @@ const dashboard = {
                 time.textContent = '--:--';
             }
             
+            info.appendChild(tokens);
             info.appendChild(time);
             
             bubble.appendChild(content);
@@ -422,4 +535,3 @@ const dashboard = {
 
 // Inicializar el dashboard cuando el documento esté listo
 document.addEventListener('DOMContentLoaded', () => dashboard.init());
-

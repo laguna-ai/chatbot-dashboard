@@ -61,21 +61,3 @@ export const formatDate = (dateString) => {
         minute: '2-digit'
     });
 };
-
-// Función para formatear mensajes
-export function formatMessage(text) {
-    if (!text) return '';
-    
-    // Escapar caracteres especiales para prevenir XSS
-    const escapedText = text
-        .replace(/&/g, '&amp;')
-        .replace(/"/g, '&quot;')
-        .replace(/'/g, '&#039;');
-        // .replace(/</g, '&lt;')
-        // .replace(/>/g, '&gt;')
-    // Convertir Markdown básico
-    return escapedText
-        .replace(/\n/g, '<br>')  // Saltos de línea
-        .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>') // Negritas
-        .replace(/\*(.*?)\*/g, '<em>$1</em>'); // Cursivas (opcional)
-}

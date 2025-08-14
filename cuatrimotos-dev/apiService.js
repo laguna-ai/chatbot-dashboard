@@ -1,5 +1,5 @@
 // Configuración de la URL base
-const baseUrl = "https://aux-funcs.azurewebsites.net/api/get_sessions?";
+const baseUrl = "http://localhost:7071";
 
 // Función para obtener sesiones
 export const getSessions = async () => {
