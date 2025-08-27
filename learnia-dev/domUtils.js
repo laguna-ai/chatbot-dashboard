@@ -63,19 +63,25 @@ export const formatDate = (dateString) => {
 };
 
 // Función para formatear mensajes
-export function formatMessage(text) {
-    if (!text) return '';
-    
-    // Escapar caracteres especiales para prevenir XSS
-    const escapedText = text
-        .replace(/&/g, '&amp;')
-        .replace(/"/g, '&quot;')
-        .replace(/'/g, '&#039;');
-        // .replace(/</g, '&lt;')
-        // .replace(/>/g, '&gt;')
-    // Convertir Markdown básico
-    return escapedText
-        .replace(/\n/g, '<br>')  // Saltos de línea
-        .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>') // Negritas
-        .replace(/\*(.*?)\*/g, '<em>$1</em>'); // Cursivas (opcional)
+export function formatMessage(msg) {
+    if (!msg) return "";
+    // 1. Proteger los <br> ya existentes (y variantes)
+    msg = msg.replace(/<br\s*\/?>/gi, "___BR___");
+    // 2. Escapar HTML peligroso
+    msg = msg
+        .replace(/&/g, "&amp;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;");
+    // 3. Restaurar los <br> originales
+    msg = msg.replace(/___BR___/g, "<br>");
+    // 4. Reemplazar saltos de línea por <br>
+    msg = msg.replace(/\n/g, "<br>");
+    // 5. Markdown: negrita, cursiva, links
+    msg = msg
+        .replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>")
+        .replace(/\*(.*?)\*/g, "<em>$1</em>")
+        .replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer" style="color:#0066cc; text-decoration:underline;">$1</a>');
+    return msg;
 }

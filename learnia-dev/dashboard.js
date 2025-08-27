@@ -65,14 +65,18 @@ const dashboard = {
         document.getElementById('csat-score').textContent = `${csatScore}%`;
         document.getElementById('csat-badge').style.setProperty('--p', `${csatScore}%`);
         
+        //Actualizar sesiones exitosas
+        document.getElementById('successful-sessions').textContent = successfulSessions;
+
+
         // Actualizar barra de éxito
-        document.getElementById('success-rate').textContent = `${csatScore}%`;
-        document.getElementById('success-bar').style.width = `${csatScore}%`;
+        // document.getElementById('success-rate').textContent = `${csatScore}%`;
+        // document.getElementById('success-bar').style.width = `${csatScore}%`;
         
  
         // Actualizar temas principales
         const topics = this.getPopularTopics(sessions);
-        document.getElementById('top-topics-count').textContent = topics.length;
+        // document.getElementById('top-topics-count').textContent = topics.length;
         if (topics.length > 0) {
             document.getElementById('topic-1').textContent = topics[0].topic;
             document.getElementById('topic-2').textContent = topics.length > 1 ? topics[1].topic : 'N/A';
